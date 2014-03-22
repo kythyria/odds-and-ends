@@ -1,9 +1,8 @@
-/**
+/*
  * LADSPA plugin to generate noise based on the logistic map function.
+ * GPLv2 or later. (c) Kyth Tieran <kythyria@berigora.net> http://github.com/kythyria
  * 
  * Compile with `g++ -o logisticmap.so -shared logisticmap.cpp`
- * 
- * GPLv2 or later, if anyone cares.
  * 
  * Don't set seed to 0 or 1, you'll get silence.
  */
@@ -27,7 +26,7 @@ public:
     LADSPA_Data *r;
     LADSPA_Data *seed;
     LADSPA_Data *outbuf;
-    LADSPA_Data current;
+    double current;
 };
 
 const unsigned long PORT_R     = 0;
@@ -133,7 +132,7 @@ void lmng_activate(LADSPA_Handle instance)
 void lmng_run(LADSPA_Handle instance, unsigned long sampleCount)
 {
     lmng_state *inst = (lmng_state*)instance;
-    LADSPA_Data r = *(inst->r);
+    double r = *(inst->r);
     if (r > 4.0f) { r = 4.0f; }
     if (r < 0.0f) { r = 0.0f; }
     
