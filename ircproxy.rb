@@ -32,10 +32,6 @@ Subcommands:
 
 Both simple and startjson print to stderr the strings read and written. "<<"
 for a write, ">>" for a read. C for clientwards, S for serverwards.
-
-This is not production-grade! For instance, it doesn't defend against a
-client sending absurdly large packets. Nor does it detect if STARTJSON is
-actually available before using it (and will crash if it isn't).
 HELP
 
 require 'yajl'
@@ -179,35 +175,6 @@ class Rfc1459Parser
     msg.command = argv.shift
     msg.args = argv
     
-    # CTCP
-    if msg.command == :privmsg || msg.command == :notice
-      msgslice = msg.args[1..-1]
-      msgpayload = msgslice ? msgslice.join(" ") : "" # Just in case
-      
-       # "Low-level" quoting
-      msgpayload.gsub! "\x100", "\x00" # NUL
-      msgpayload.gsub! "\x10n", "\x0a" # LF
-      msgpayload.gsub! "\x10r", "\x0d" # CR
-      msgpayload.gsub! /\x10(.)/, "\\1" # Undo all other quoting
-      
-      # Tagging. This isn't the full thing where \x01 shifts in and out, because that's
-      # neither a good idea nor actually used in practice. No escaping, either.
-      # TODO: See if INQUIRE would be useful as an internal translation even if not accepted.
-      if msgpayload.start_with? "\x01"
-        msgpayload = if msgpayload.end_with? "\x01"
-          msgpayload.slice!(1..-2)
-        else
-          msgpayload.slice!(1..-1)
-        end
-        
-        intent, args = msgpayload.split(" ", 2)
-        
-        msg.command = ("ctcp_" + msg.command.to_s).to_sym
-        args.unshift intent.downcase.to_sym
-        msg.arg = args
-      end
-    end
-    
     return msg
   end
   
@@ -232,12 +199,6 @@ class Rfc1459Parser
     
     arglist = message.args.dup
     
-    if commandstr.start_with? "ctcp_"
-      intent, payload = arglist.pop(2)
-      payload = "\x01#{intent.to_s.upcase} #{payload}\x01"
-      arglist << payload
-    end
-    
     last = arglist.pop
     if (last && (last != "")) && last.include?(" ")
       last = ":" + last
@@ -250,12 +211,9 @@ class Rfc1459Parser
 end
 
 #############
-# This parses NEARLY kaniini's proposal. Namely,
-# [tags, sender, verb, arg1, arg2...]
+# This parses NEARLY DarthGandalf's proposal. Namely,
+# {tags: {}, sender: ""|null, verb: "", params: ["", ...]}
 # where tags is a hash, sender a string or nil, verb string or int, and args are strings.
-#
-# CTCP is represented by a CTCP_PRIVMSG or CTCP_NOTICE verb. So,
-# [{}, "Kyth!Kyth@somewhere", "CTCP_PRIVMSG", "#ircv3", "ACTION thinks this is a terrible way to represent CTCP"]
 #############
 class JsonParser
   attr_accessor :on_message
